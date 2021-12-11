@@ -119,6 +119,13 @@ class OscaroSpider(scrapy.Spider):
             break
 
         # # handle pagination
+        # get the total number of pages
+        max_pages = response.css(".pager li:nth-last-child(-n+2) a ::text").get()
+        # loop n times and create new url
+        for i in range(2, max_pages+1):
+            paginated_url = response.url + "&page=" + str(i)
+            yield response.follow(url=paginated_url, callback=self.parse_details)
+
         # next_page = response.css("a.ico-chevron-right::attr(href)").get()
         # if next_page is not None:
         #     yield response.follow(url=next_page, callback=self.parse_details)
@@ -126,7 +133,7 @@ class OscaroSpider(scrapy.Spider):
     def parse_details(self, response):
         product_name = response.css(".product-title span:nth-child(2) span:nth-child(1) ::text").get() + " " + \
                        response.css(".product-title span:nth-child(2) span:nth-child(2) ::text").get()
-        log_text(product_name)
+        # log_text(product_name)
         save_page_html(response.text.encode("UTF-8"), product_name)
         # with open(f"{section_name}/{subcategory_name}/{product_section}/{product_name}.txt", "w") as f:
         #     f.write(str(response.text.encode("UTF-8")))

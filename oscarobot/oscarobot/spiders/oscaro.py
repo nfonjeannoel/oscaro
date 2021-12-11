@@ -1,10 +1,11 @@
 import scrapy
 from scrapy.crawler import CrawlerProcess
 import os
+from os import path
 
 section_name = ""
 subcategory_name = ""
-# product_section = ""
+product_section = ""
 section_number = 1
 sub_section_number = 1
 
@@ -33,22 +34,32 @@ def create_path_sub_section(my_section_name):
     except OSError as error:
         print("Directory '%s' can not be created" % my_section_name)
 
-#
-# def create_path_product_section(my_section_name):
-#     parent_dir = f"C:/Users/JEANNOEL/PycharmProjects/oscaro/{section_name}/{subcategory_name}"
-#     path = os.path.join(parent_dir, my_section_name)
-#     try:
-#         os.makedirs(path, exist_ok=True)
-#         print("Directory '%s' created successfully" % my_section_name)
-#
-#     except OSError as error:
-#         print("Directory '%s' can not be created" % my_section_name)
+
+def create_path_product_section(my_section_name):
+    parent_dir = f"C:/Users/JEANNOEL/PycharmProjects/oscaro/{section_name}/{subcategory_name}"
+    path = os.path.join(parent_dir, my_section_name)
+
+    try:
+        os.makedirs(path, exist_ok=True)
+        print("Directory '%s' created successfully" % my_section_name)
+
+    except OSError as error:
+        print("Directory '%s' can not be created" % my_section_name)
 
 
 def log_text(param):
     print("*" * 20)
     print(str(param))
     print("*" * 20)
+
+
+def save_page_html(page_html, product_name):
+    # file_path = path.relpath(f"{section_name}/{subcategory_name}/{product_section}/{product_name}.txt")
+    # with open(file_path, "w") as f:
+    #     f.write(str(page_html))
+    path = f"C:/Users/JEANNOEL/PycharmProjects/oscaro"
+    with open(f"{path}/{section_name}/{subcategory_name}/{product_section}/{product_name}.txt", "w") as f:
+        f.write(str(page_html))
 
 
 class OscaroSpider(scrapy.Spider):
@@ -71,7 +82,7 @@ class OscaroSpider(scrapy.Spider):
             # log_text(section_name)
             # getting main category links
             url = section.css("h2 a").css("::attr(href)").get()
-            log_text(url)
+            # log_text(url)
             # creating path with name as the current section title - section_name
             create_path_section(section_name)
             yield response.follow(url=url, callback=self.parse_category)
@@ -99,20 +110,24 @@ class OscaroSpider(scrapy.Spider):
 
     def parse_products(self, response):
         global product_section
-        product_section = response.css(".boxed-title font font ::text").get()
+        product_section = response.css("h1.boxed-title ::text").get()
         product_urls = response.css("h1 > a").css("::attr(href)").getall()
-        # create_path_product_section(product_section)
+        # log_text(product_section)
+        create_path_product_section(product_section)
         for product_url in product_urls:
             yield response.follow(url=product_url, callback=self.parse_details)
+            break
 
-        # handle pagination
-        next_page = response.css("a.ico-chevron-right::attr(href)").get()
-        if next_page is not None:
-            yield response.follow(url=next_page, callback=self.parse_details)
+        # # handle pagination
+        # next_page = response.css("a.ico-chevron-right::attr(href)").get()
+        # if next_page is not None:
+        #     yield response.follow(url=next_page, callback=self.parse_details)
 
     def parse_details(self, response):
         product_name = response.css(".product-title span:nth-child(2) span:nth-child(1) ::text").get() + " " + \
                        response.css(".product-title span:nth-child(2) span:nth-child(2) ::text").get()
+        log_text(product_name)
+        save_page_html(response.text.encode("UTF-8"), product_name)
         # with open(f"{section_name}/{subcategory_name}/{product_section}/{product_name}.txt", "w") as f:
         #     f.write(str(response.text.encode("UTF-8")))
         # yield None

@@ -1,3 +1,5 @@
+import json
+
 import scrapy
 from scrapy.crawler import CrawlerProcess
 import os
@@ -53,13 +55,16 @@ def log_text(param):
     print("*" * 20)
 
 
-def save_page_html(page_html, product_name):
+def save_page_html(page_html, product_name, my_json):
     # file_path = path.relpath(f"{section_name}/{subcategory_name}/{product_section}/{product_name}.txt")
     # with open(file_path, "w") as f:
     #     f.write(str(page_html))
     path = f"C:/Users/JEANNOEL/PycharmProjects/oscaro"
     with open(f"{path}/{section_name}/{subcategory_name}/{product_section}/{product_name}.txt", "w") as f:
         f.write(str(page_html))
+
+    with open(f"{path}/{section_name}/{subcategory_name}/{product_section}/{product_section}.json", "a+") as f:
+        f.write(json.dumps(my_json))
 
 
 class OscaroSpider(scrapy.Spider):
@@ -165,7 +170,7 @@ class OscaroSpider(scrapy.Spider):
         for product_url in product_urls:
             yield response.follow(url=product_url, callback=self.parse_details)
         #
-            # break
+        # break
 
         # # handle pagination
         # get the total number of pages
@@ -197,38 +202,64 @@ class OscaroSpider(scrapy.Spider):
         product_name = response.css(".product-title span:nth-child(2) span:nth-child(1) ::text").get() + " " + \
                        response.css(".product-title span:nth-child(2) span:nth-child(2) ::text").get()
         # log_text(product_name)
-        save_page_html(response.text.encode("UTF-8"), product_name)
-        # with open(f"{section_name}/{subcategory_name}/{product_section}/{product_name}.txt", "w") as f:
-        #     f.write(str(response.text.encode("UTF-8")))
-        # yield None
-        # product_name = response.css(".product-title span:nth-child(2) span:nth-child(1) ::text").get() + " " + \
-        #                response.css(".product-title span:nth-child(2) span:nth-child(2) ::text").get()
-        #
-        # price = {
-        #     "value": response.css(".price meta:nth-child(2) ::attr(content)").get(),
-        #     "currency": response.css(".price meta:nth-child(1) ::attr(content)").get()
-        # }
-        # category_levels = response.css(".navigation-breadcrumb li a span ::text").getall()[1:]
-        # brand = response.css("#productDetail > section > article > div.product-infos > section.about > dl > dd:nth-child(5) > ul > li:nth-child(1) > ul > li:nth-child(2) > span:nth-child(2) ::text").get()
-        # images = response.css(".thumbnail img::attr(src)").getall()
-        # meta_keys = response.css(".ref ul:last-child li b ::text").getall()
-        # meta_values = response.css(".ref ul:last-child li span ::text").getall()
-        # meta_dict = {}
-        # for key, value in zip(meta_keys, meta_values):
-        #     meta_dict[key] = value
-        # meta_data = {
-        #     "rrp": response.css(".public-price span ::text").get(),
-        #     "references": meta_dict
-        # }
-        #
-        # yield {
-        #     "product_name": product_name,
-        #     "price": price,
-        #     "category_levels": category_levels,
-        #     "brand": brand,
-        #     "images": images,
-        #     "meta_data": meta_data
-        # }
+
+        def get_selector(sel):
+            return response.css(sel).get()
+
+        def get_all_selector(sel):
+            return response.css(sel).getall()
+
+        product_name = get_selector(".navigation-breadcrumb li:last-child meta:last-child ::attr(content)")
+        price = get_selector(".price span::text")
+        value = price.split()[0]
+        currency = price.split()[-1]
+        product_price = {
+            "value": value,
+            "currency": currency
+        }
+
+        category_levels = " > ".join(get_all_selector(".navigation-breadcrumb li a span ::text")[1:-1])
+        # brand = get_selector(".about dd:last-child  li  ul li:nth-child(2) span:nth-child(2)::text")
+        brand = "NA"
+        brands = response.css(".about > dl > dd:nth-child(5) > ul > li:nth-child(1) > ul  li:not(:first-child)")
+        for brand_i in brands:
+            title = brand_i.css(".title-def::text").get()
+            if "Gama" in title:
+                brand = brand_i.css("span:last-child ::text").get()
+                break
+
+        product_code = get_selector(".ref-piece::text").replace("-", "").strip()
+        product_page_url = response.url
+        rrp = get_selector(".public-price span::text")
+        ref_dict = {}
+
+        list_ref = response.css(".list-ref")
+        for lr in list_ref:
+            mkey = lr.css(".bold ::text").get()
+            if mkey is None:
+                mkey = lr.css("b ::text").get()
+            mkey = mkey.replace(":", "").strip()
+            mvalue = " ".join(lr.css("span:nth-child(n+2) ::text").getall()).replace("  ", " ").strip()
+            ref_dict[mkey] = mvalue
+            images = response.css(".thumbnail img::attr(src)").getall()
+        meta_data = {
+            "rrp": rrp,
+            "references": ref_dict,
+            "images": images
+        }
+
+        data = {
+            "product_name": product_name,
+            "price": product_price,
+            "product_code": product_code,
+            "product_page_url": product_page_url,
+            "category_levels": category_levels,
+            "brand": brand,
+            "meta_data": meta_data
+
+        }
+
+        save_page_html(response.text.encode("UTF-8"), product_name, data)
 
 
 process = CrawlerProcess()

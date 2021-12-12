@@ -1,24 +1,26 @@
-# # Python program to explain os.mkdir() method
-#
-# # importing os module
-# import os
-# from random import randint
-# # Directory
-# directory = "DownloadedText"
-#
-# # Parent Directory path
-# parent_dir = "C:/Users/JEANNOEL/PycharmProjects/oscaro"
-#
-# # Path
-# path = os.path.join(parent_dir, directory)
-#
-# try:
-#     os.makedirs(path, exist_ok = True)
-#     print("Directory '%s' created successfully" % directory)
-#
-# except OSError as error:
-#     print("Directory '%s' can not be created, it already exist" % directory)
-#
+# Import Module
+import os
 
-with open("oscarobot/oscarobot/a.tx", "w") as f:
-    f.write("something")
+# Folder Path
+path = "C:/Users/JEANNOEL/PycharmProjects/oscaro/Piezas de motor/Correas/Bomba de agua + kit correa distribución"
+
+# Change the directory
+os.chdir(path)
+
+
+# Read text File
+
+
+def read_text_file(file_path):
+    with open(file_path, 'r') as f:
+        print(f.read())
+print(len(os.listdir()))
+
+# iterate through all file
+# for file in os.listdir():
+#     # Check whether file is in text format or not
+#     if file.endswith(".txt"):
+#         file_path = f"{path}\{file}"
+#
+#         # call read text file function
+#         read_text_file(file_path)

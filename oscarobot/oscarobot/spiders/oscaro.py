@@ -67,6 +67,7 @@ class OscaroSpider(scrapy.Spider):
     # allowed_domains = ['x']
     # start_urls = ["https://www-oscaro-com.translate.goog/?_x_tr_sl=fr&_x_tr_tl=en&_x_tr_hl=en&_x_tr_pto=sc"]
     start_urls = ["https://www-oscaro-es.translate.goog/?_x_tr_sl=es&_x_tr_tl=es&_x_tr_hl=es&_x_tr_pto=sc"]
+
     # start_urls = ["https://www-oscaro-com.translate.goog/outils-de-mesure-et-controle-702661-sc?_x_tr_sl=fr&_x_tr_tl=en&_x_tr_hl=en&_x_tr_pto=sc"]
 
     def parse(self, response):
@@ -86,6 +87,8 @@ class OscaroSpider(scrapy.Spider):
             # creating path with name as the current section title - section_name
             create_path_section(section_name)
             yield response.follow(url=url, callback=self.parse_category)
+
+            # optional break in case more than one section is returned
             break
 
     def parse_category(self, response):
@@ -98,15 +101,59 @@ class OscaroSpider(scrapy.Spider):
             # getting subcategory links
             subcategory_name = section.css("h2 a").css("::text").get()
             # get all urls excluding the last as it is the url for see more
-            urls = section.css("ul li a").css("::attr(href)").getall()[:-1]
+            urls = section.css("ul li a").css("::attr(href)").getall()
+            # log_text(urls[-1])
             # create directory for this sub category
             create_path_sub_section(subcategory_name)
             # break
-            for url in urls:
-                yield response.follow(url=url, callback=self.parse_products)
-                # to follow only one url
-                break
-            break
+            # code to get single url
+            start_url_num = 1
+            end_url_num = len(urls)
+            # before saving the variable, try to read the same file,
+            # if you get a file not found error error, then go ahead and create a new file
+            try:
+                with open("CurrentUrl.txt", "r") as f:
+                    # data is of the form "x of n"
+                    # split to get a list
+                    data = f.read().split()
+                    start_url_num = int(data[0])
+                    end_url_num = int(data[-1])
+                    f.close()
+            except FileNotFoundError:
+                # create new file
+                with open("CurrentUrl.txt", "w") as f:
+                    f.write(f"{start_url_num} of {end_url_num}")
+                    f.close()
+            # current url to scrape
+            if start_url_num == end_url_num:
+                for j in range(10):
+                    log_text("scraping is done")
+                return
+            url = urls[start_url_num - 1]
+            yield response.follow(url=url, callback=self.parse_products)
+            # update the size of the file and current url number
+            with open("CurrentUrl.txt", "w") as f:
+                f.write(f"{start_url_num + 1} of {end_url_num}")
+                f.close()
+
+            # create variable start_url_num : int = 0
+            # create variable end_url_num : int = 0
+            # try to save size of the the url variable in a file
+            # before saving the variable, try to read the same file,
+            # if you get a file not found error error, then go ahead and create a new file
+            # update the size of the file and current url number
+            # eg 1 out of 5
+            # now read the file
+            # check that the first element eg here is [1 = x] is not greater than the last element
+            # eg here is 5
+            # access the url at the x position and scrape the data
+            # then save again the file with x + 1 out of n url [n = max size]
+
+            # to follow only one url
+            # break
+
+            # optional break in case sub category returns more than one
+            # break
 
     def parse_products(self, response):
         global product_section
@@ -114,21 +161,37 @@ class OscaroSpider(scrapy.Spider):
         product_urls = response.css("h1 > a").css("::attr(href)").getall()
         # log_text(product_section)
         create_path_product_section(product_section)
+        #
         for product_url in product_urls:
             yield response.follow(url=product_url, callback=self.parse_details)
-            break
+        #
+            # break
 
         # # handle pagination
         # get the total number of pages
-        max_pages = response.css(".pager li:nth-last-child(-n+2) a ::text").get()
+        max_pages = int(response.css(".pager li:nth-last-child(-n+2) a ::text").get())
+        # log_text(f"max pages - {max_pages}")
         # loop n times and create new url
-        for i in range(2, max_pages+1):
+        # looping through all the pagination
+        for i in range(2, max_pages + 1):
+            # log_text(f"scraped {len(product_urls) * i} of {len(product_urls) * max_pages + 1}")
+            log_text(f"page {i}")
             paginated_url = response.url + "&page=" + str(i)
-            yield response.follow(url=paginated_url, callback=self.parse_details)
+            yield response.follow(url=paginated_url, callback=self.parse_products_pagination)
+            # break
 
-        # next_page = response.css("a.ico-chevron-right::attr(href)").get()
-        # if next_page is not None:
-        #     yield response.follow(url=next_page, callback=self.parse_details)
+        next_page = response.css("a.ico-chevron-right::attr(href)").get()
+        if next_page is not None:
+            yield response.follow(url=next_page, callback=self.parse_details)
+
+    def parse_products_pagination(self, response):
+        global product_section
+        product_section = response.css("h1.boxed-title ::text").get()
+        product_urls = response.css("h1 > a").css("::attr(href)").getall()
+        # log_text(product_section)
+        for product_url in product_urls:
+            yield response.follow(url=product_url, callback=self.parse_details)
+            # break
 
     def parse_details(self, response):
         product_name = response.css(".product-title span:nth-child(2) span:nth-child(1) ::text").get() + " " + \

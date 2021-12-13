@@ -5,8 +5,8 @@ from scrapy.crawler import CrawlerProcess
 import os
 from os import path
 from scraper_api import ScraperAPIClient
-API_KEY = "95bda0384c21c69a44113abe9edc0045"
-client = ScraperAPIClient(API_KEY)
+# API_KEY = "95bda0384c21c69a44113abe9edc0045"
+# client = ScraperAPIClient(API_KEY)
 section_name = ""
 subcategory_name = ""
 product_section = ""

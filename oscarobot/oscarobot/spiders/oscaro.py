@@ -1,10 +1,12 @@
 import json
-
+from urllib.parse import urlencode
 import scrapy
 from scrapy.crawler import CrawlerProcess
 import os
 from os import path
-
+from scraper_api import ScraperAPIClient
+API_KEY = "95bda0384c21c69a44113abe9edc0045"
+client = ScraperAPIClient(API_KEY)
 section_name = ""
 subcategory_name = ""
 product_section = ""
@@ -66,14 +68,23 @@ def save_page_html(page_html, product_name, my_json):
     with open(f"{path}/{section_name}/{subcategory_name}/{product_section}/{product_section}.json", "a+") as f:
         f.write(json.dumps(my_json))
 
+# def get_scraperapi_url(url):
+#     payload = {'api_key': API_KEY, 'url': url}
+#     proxy_url = 'http://api.scraperapi.com/?' + urlencode(payload)
+#     return proxy_url
+
 
 class OscaroSpider(scrapy.Spider):
     name = 'oscaro'
     # allowed_domains = ['x']
     # start_urls = ["https://www-oscaro-com.translate.goog/?_x_tr_sl=fr&_x_tr_tl=en&_x_tr_hl=en&_x_tr_pto=sc"]
     start_urls = ["https://www-oscaro-es.translate.goog/?_x_tr_sl=es&_x_tr_tl=es&_x_tr_hl=es&_x_tr_pto=sc"]
-
     # start_urls = ["https://www-oscaro-com.translate.goog/outils-de-mesure-et-controle-702661-sc?_x_tr_sl=fr&_x_tr_tl=en&_x_tr_hl=en&_x_tr_pto=sc"]
+
+    # def start_requests(self):
+    #     urls = ["https://www-oscaro-es.translate.goog/?_x_tr_sl=es&_x_tr_tl=es&_x_tr_hl=es&_x_tr_pto=sc"]
+    #     for url in urls:
+    #         yield scrapy.Request(client.scrapyGet(url=url), callback=self.parse)
 
     def parse(self, response):
         # log_text(response.text.encode("UTF-8"))
@@ -241,7 +252,7 @@ class OscaroSpider(scrapy.Spider):
             mkey = mkey.replace(":", "").strip()
             mvalue = " ".join(lr.css("span:nth-child(n+2) ::text").getall()).replace("  ", " ").strip()
             ref_dict[mkey] = mvalue
-            images = response.css(".thumbnail img::attr(src)").getall()
+        images = response.css(".thumbnail img::attr(src)").getall()
         meta_data = {
             "rrp": rrp,
             "references": ref_dict,

@@ -12,7 +12,8 @@ BOT_NAME = 'oscarobot'
 SPIDER_MODULES = ['oscarobot.spiders']
 NEWSPIDER_MODULE = 'oscarobot.spiders'
 
-
+CONCURRENT_REQUESTS = 5
+RETRY_TIMES = 5
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
 #USER_AGENT = 'oscarobot (+http://www.yourdomain.com)'
 # USER_AGENT = 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'

@@ -1,16 +1,37 @@
 import json
+from random import randint
+# from time import sleep
 from urllib.parse import urlencode
 import scrapy
 from scrapy.crawler import CrawlerProcess
 import os
 from os import path
 from scraper_api import ScraperAPIClient
+
 # client = ScraperAPIClient(API_KEY)
 section_name = ""
 subcategory_name = ""
 product_section = ""
 section_number = 1
-sub_section_number = 1
+sub_section_number = 4
+
+
+# todo red sec1 sub 3, sec1 sub 3 Cu 3
+
+def get_proxy():
+    ROTATING_PROXY_LIST = [
+
+        'http://162.55.163.74:19993',
+        'http://162.55.163.74:19994',
+        'http://162.55.163.74:19995',
+        'http://162.55.163.74:19996',
+        'http://162.55.163.74:19997',
+        'http://162.55.163.74:19998',
+        'http://162.55.163.74:19999',
+        'http://162.55.163.74:20000'
+    ]
+    size = len(ROTATING_PROXY_LIST) - 1
+    return ROTATING_PROXY_LIST[randint(0, size)]
 
 
 # parent_dir = "C:/Users/JEANNOEL/PycharmProjects/oscaro"
@@ -29,7 +50,7 @@ def create_path_section(my_section_name):
 
 def create_path_sub_section(my_section_name):
     parent_dir = f"C:/Users/JEANNOEL/PycharmProjects/oscaro/{section_name}"
-    path = os.path.join(parent_dir, my_section_name)
+    path = os.path.join(parent_dir, str(my_section_name))
     try:
         os.makedirs(path, exist_ok=True)
         print("Directory '%s' created successfully" % my_section_name)
@@ -40,7 +61,7 @@ def create_path_sub_section(my_section_name):
 
 def create_path_product_section(my_section_name):
     parent_dir = f"C:/Users/JEANNOEL/PycharmProjects/oscaro/{section_name}/{subcategory_name}"
-    path = os.path.join(parent_dir, my_section_name)
+    path = os.path.join(parent_dir, str(my_section_name))
 
     try:
         os.makedirs(path, exist_ok=True)
@@ -67,6 +88,7 @@ def save_page_html(page_html, product_name, my_json):
     with open(f"{path}/{section_name}/{subcategory_name}/{product_section}/{product_section}.json", "a+") as f:
         f.write(json.dumps(my_json))
 
+
 # def get_scraperapi_url(url):
 #     payload = {'api_key': API_KEY, 'url': url}
 #     proxy_url = 'http://api.scraperapi.com/?' + urlencode(payload)
@@ -75,12 +97,17 @@ def save_page_html(page_html, product_name, my_json):
 
 class OscaroSpider(scrapy.Spider):
     name = 'oscaro'
+
     # allowed_domains = ['x']
     # start_urls = ["https://www-oscaro-com.translate.goog/?_x_tr_sl=fr&_x_tr_tl=en&_x_tr_hl=en&_x_tr_pto=sc"]
-    start_urls = ["https://www-oscaro-es.translate.goog/?_x_tr_sl=es&_x_tr_tl=es&_x_tr_hl=es&_x_tr_pto=sc"]
+    # start_urls = ["https://www-oscaro-es.translate.goog/?_x_tr_sl=es&_x_tr_tl=es&_x_tr_hl=es&_x_tr_pto=sc"]
+
     # start_urls = ["https://www-oscaro-com.translate.goog/outils-de-mesure-et-controle-702661-sc?_x_tr_sl=fr&_x_tr_tl=en&_x_tr_hl=en&_x_tr_pto=sc"]
 
-    # def start_requests(self):
+    def start_requests(self):
+        url = "https://www-oscaro-es.translate.goog/?_x_tr_sl=es&_x_tr_tl=es&_x_tr_hl=es&_x_tr_pto=sc"
+        yield scrapy.Request(url=url, meta={"proxy": get_proxy()}, callback=self.parse)
+
     #     urls = ["https://www-oscaro-es.translate.goog/?_x_tr_sl=es&_x_tr_tl=es&_x_tr_hl=es&_x_tr_pto=sc"]
     #     for url in urls:
     #         yield scrapy.Request(client.scrapyGet(url=url), callback=self.parse)
@@ -101,7 +128,7 @@ class OscaroSpider(scrapy.Spider):
             # log_text(url)
             # creating path with name as the current section title - section_name
             create_path_section(section_name)
-            yield response.follow(url=url, callback=self.parse_category)
+            yield response.follow(url=url, callback=self.parse_category, meta={"proxy": get_proxy()})
 
             # optional break in case more than one section is returned
             break
@@ -140,12 +167,12 @@ class OscaroSpider(scrapy.Spider):
                     f.write(f"{start_url_num} of {end_url_num}")
                     f.close()
             # current url to scrape
-            if start_url_num == end_url_num:
+            if start_url_num > end_url_num:
                 for j in range(10):
                     log_text("scraping is done")
                 return
             url = urls[start_url_num - 1]
-            yield response.follow(url=url, callback=self.parse_products)
+            yield response.follow(url=url, callback=self.parse_products, meta={"proxy": get_proxy()})
             # update the size of the file and current url number
             with open("CurrentUrl.txt", "w") as f:
                 f.write(f"{start_url_num + 1} of {end_url_num}")
@@ -173,31 +200,44 @@ class OscaroSpider(scrapy.Spider):
     def parse_products(self, response):
         global product_section
         product_section = response.css("h1.boxed-title ::text").get()
+        # is page structure is different
+        if product_section is None:
+            product_section = response.css("div.boxed-title h1 ::text").get()
         product_urls = response.css("h1 > a").css("::attr(href)").getall()
+        # page structured different eg https://www.oscaro.es/tubo-flexible-de-combustible-609-gu?__cf_chl_jschl_tk__=aIdG1Oq6Z_lBSDYAFnq8rdASXF5pLhfvAgCKdmPp8J8-1639546723-0-gaNycGzNCZE
+        if not product_urls:
+            product_urls = response.css(".product-title a").css("::attr(href)").getall()
         # log_text(product_section)
         create_path_product_section(product_section)
         #
         for product_url in product_urls:
-            yield response.follow(url=product_url, callback=self.parse_details)
+            yield response.follow(url=product_url, callback=self.parse_details, meta={"proxy": get_proxy()})
         #
         # break
 
         # # handle pagination
         # get the total number of pages
-        max_pages = int(response.css(".pager li:nth-last-child(-n+2) a ::text").get())
+        max_pages = int(response.css(".pager li:not(:last-child):nth-last-child(-n+2) a ::text").get())
         # log_text(f"max pages - {max_pages}")
         # loop n times and create new url
         # looping through all the pagination
+        # n = 41
         for i in range(2, max_pages + 1):
+            # if i > n:
+            #     print("sleeping 10 munites")
+            #     n += 41
+            #     sleep(600)
             # log_text(f"scraped {len(product_urls) * i} of {len(product_urls) * max_pages + 1}")
             log_text(f"page {i}")
             paginated_url = response.url + "&page=" + str(i)
-            yield response.follow(url=paginated_url, callback=self.parse_products_pagination)
+            yield response.follow(url=paginated_url, callback=self.parse_products_pagination,
+                                  meta={"proxy": get_proxy()})
+            # sleep(5)
             # break
 
-        next_page = response.css("a.ico-chevron-right::attr(href)").get()
-        if next_page is not None:
-            yield response.follow(url=next_page, callback=self.parse_details)
+        # next_page = response.css("a.ico-chevron-right::attr(href)").get()
+        # if next_page is not None:
+        #     yield response.follow(url=next_page, callback=self.parse_details)
 
     def parse_products_pagination(self, response):
         global product_section
@@ -205,12 +245,13 @@ class OscaroSpider(scrapy.Spider):
         product_urls = response.css("h1 > a").css("::attr(href)").getall()
         # log_text(product_section)
         for product_url in product_urls:
-            yield response.follow(url=product_url, callback=self.parse_details)
+            yield response.follow(url=product_url, callback=self.parse_details, meta={"proxy": get_proxy()})
             # break
+            # sleep(1)
 
     def parse_details(self, response):
-        product_name = response.css(".product-title span:nth-child(2) span:nth-child(1) ::text").get() + " " + \
-                       response.css(".product-title span:nth-child(2) span:nth-child(2) ::text").get()
+        # product_name = response.css(".product-title span:nth-child(2) span:nth-child(1) ::text").get() + " " + \
+        #                response.css(".product-title span:nth-child(2) span:nth-child(2) ::text").get()
         # log_text(product_name)
 
         def get_selector(sel):

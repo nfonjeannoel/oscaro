@@ -57,12 +57,13 @@ def create_path_sub_section(my_section_name):
 
     except OSError as error:
         print("Directory '%s' can not be created" % my_section_name)
-
+    return False
 
 def create_path_product_section(my_section_name):
     parent_dir = f"C:/Users/JEANNOEL/PycharmProjects/oscaro/{section_name}/{subcategory_name}"
     path = os.path.join(parent_dir, str(my_section_name))
-
+    if os.path.exists(path):
+        return True
     try:
         os.makedirs(path, exist_ok=True)
         print("Directory '%s' created successfully" % my_section_name)
@@ -134,68 +135,54 @@ class OscaroSpider(scrapy.Spider):
             break
 
     def parse_category(self, response):
+        sections = response.css(f".subcat:nth-child({sub_section_number})")
+        for section in sections:
+            url = section.css("h2 a ::attr(href)").get()
+            response.follow(url=url, callback=self.parse_category_extended)
+
+    def parse_category_extended(self, response):
         # sections = response.css(".subcat")
         # get all the cards in the subcategory page [gets the first card]
-        sections = response.css(f".subcat:nth-child({sub_section_number})")
+
         global subcategory_name
         # get all the links in a particular card
-        for section in sections:
-            # getting subcategory links
-            subcategory_name = section.css("h2 a").css("::text").get()
-            # get all urls excluding the last as it is the url for see more
-            urls = section.css("ul li a").css("::attr(href)").getall()
-            # log_text(urls[-1])
-            # create directory for this sub category
-            create_path_sub_section(subcategory_name)
-            # break
-            # code to get single url
-            start_url_num = 1
-            end_url_num = len(urls)
-            # before saving the variable, try to read the same file,
-            # if you get a file not found error error, then go ahead and create a new file
-            try:
-                with open("CurrentUrl.txt", "r") as f:
-                    # data is of the form "x of n"
-                    # split to get a list
-                    data = f.read().split()
-                    start_url_num = int(data[0])
-                    end_url_num = int(data[-1])
-                    f.close()
-            except FileNotFoundError:
-                # create new file
-                with open("CurrentUrl.txt", "w") as f:
-                    f.write(f"{start_url_num} of {end_url_num}")
-                    f.close()
-            # current url to scrape
-            if start_url_num > end_url_num:
-                for j in range(10):
-                    log_text("scraping is done")
-                return
-            url = urls[start_url_num - 1]
-            yield response.follow(url=url, callback=self.parse_products, meta={"proxy": get_proxy()})
-            # update the size of the file and current url number
-            with open("CurrentUrl.txt", "w") as f:
-                f.write(f"{start_url_num + 1} of {end_url_num}")
+        # getting subcategory links
+        subcategory_name = response.css(".boxed-title::text").get()
+        # get all urls excluding the last as it is the url for see more
+        urls = response.css("#categoriesTree a ::attr(href)").getall()
+        # log_text(urls[-1])
+        # create directory for this sub category
+        create_path_sub_section(subcategory_name)
+        # break
+        # code to get single url
+        start_url_num = 1
+        end_url_num = len(urls)
+        # before saving the variable, try to read the same file,
+        # if you get a file not found error error, then go ahead and create a new file
+        try:
+            with open("CurrentUrl.txt", "r") as f:
+                # data is of the form "x of n"
+                # split to get a list
+                data = f.read().split()
+                start_url_num = int(data[0])
+                end_url_num = int(data[-1])
                 f.close()
-
-            # create variable start_url_num : int = 0
-            # create variable end_url_num : int = 0
-            # try to save size of the the url variable in a file
-            # before saving the variable, try to read the same file,
-            # if you get a file not found error error, then go ahead and create a new file
-            # update the size of the file and current url number
-            # eg 1 out of 5
-            # now read the file
-            # check that the first element eg here is [1 = x] is not greater than the last element
-            # eg here is 5
-            # access the url at the x position and scrape the data
-            # then save again the file with x + 1 out of n url [n = max size]
-
-            # to follow only one url
-            # break
-
-            # optional break in case sub category returns more than one
-            # break
+        except FileNotFoundError:
+            # create new file
+            with open("CurrentUrl.txt", "w") as f:
+                f.write(f"{start_url_num} of {end_url_num}")
+                f.close()
+        # current url to scrape
+        if start_url_num > end_url_num:
+            for j in range(10):
+                log_text("scraping is done")
+            return
+        url = urls[start_url_num - 1]
+        yield response.follow(url=url, callback=self.parse_products, meta={"proxy": get_proxy()})
+        # update the size of the file and current url number
+        with open("CurrentUrl.txt", "w") as f:
+            f.write(f"{start_url_num + 1} of {end_url_num}")
+            f.close()
 
     def parse_products(self, response):
         global product_section
@@ -203,12 +190,17 @@ class OscaroSpider(scrapy.Spider):
         # is page structure is different
         if product_section is None:
             product_section = response.css("div.boxed-title h1 ::text").get()
+
+
         product_urls = response.css("h1 > a").css("::attr(href)").getall()
         # page structured different eg https://www.oscaro.es/tubo-flexible-de-combustible-609-gu?__cf_chl_jschl_tk__=aIdG1Oq6Z_lBSDYAFnq8rdASXF5pLhfvAgCKdmPp8J8-1639546723-0-gaNycGzNCZE
         if not product_urls:
             product_urls = response.css(".product-title a").css("::attr(href)").getall()
         # log_text(product_section)
-        create_path_product_section(product_section)
+        path_already_scraped = create_path_product_section(product_section)
+        if path_already_scraped:
+            log_text(f"already scraped {product_section}")
+            return
         #
         for product_url in product_urls:
             yield response.follow(url=product_url, callback=self.parse_details, meta={"proxy": get_proxy()})
